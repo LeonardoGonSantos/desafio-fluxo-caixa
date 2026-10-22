@@ -1,4 +1,5 @@
 using FluentValidation;
+using FluentValidation.Results;
 using FluxoCaixa.BuildingBlocks.Cqrs;
 using FluxoCaixa.BuildingBlocks.Results;
 
@@ -9,17 +10,31 @@ internal static class ValidationRunner
     public static async Task<Error?> ValidateAsync<T>(
         IEnumerable<IValidator<T>> validators, T instance, CancellationToken cancellationToken)
     {
-        var failures = new List<string>();
+        var failures = new List<ValidationFailure>();
         foreach (var validator in validators)
         {
             var result = await validator.ValidateAsync(instance, cancellationToken);
-            failures.AddRange(result.Errors.Select(e => e.ErrorMessage));
+            failures.AddRange(result.Errors);
         }
 
-        return failures.Count == 0
-            ? null
-            : Error.Validation("validation.failed", string.Join(" ", failures.Distinct()));
+        if (failures.Count == 0)
+        {
+            return null;
+        }
+
+        var details = failures
+            .GroupBy(f => ToCamelCase(f.PropertyName))
+            .ToDictionary(g => g.Key, g => g.Select(f => f.ErrorMessage).Distinct().ToArray());
+
+        return Error.Validation(
+            "validation.failed",
+            string.Join(" ", failures.Select(f => f.ErrorMessage).Distinct()),
+            details);
     }
+
+    /// <summary>Alinha a chave do erro ao nome do campo no JSON (camelCase).</summary>
+    private static string ToCamelCase(string propertyName) =>
+        string.IsNullOrEmpty(propertyName) ? propertyName : char.ToLowerInvariant(propertyName[0]) + propertyName[1..];
 }
 
 public sealed class CommandValidationDecorator<TCommand, TResponse>(

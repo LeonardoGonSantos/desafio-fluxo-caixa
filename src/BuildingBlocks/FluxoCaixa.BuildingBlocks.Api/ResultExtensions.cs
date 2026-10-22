@@ -19,7 +19,14 @@ public static class ResultExtensions
             _ => (StatusCodes.Status500InternalServerError, "Erro interno"),
         };
 
-        var problem = new ProblemDetails { Status = status, Title = title, Detail = error.Message };
+        // Erros de validação com detalhe por campo seguem o padrão ValidationProblemDetails (campo "errors").
+        ProblemDetails problem = error.Details is { Count: > 0 }
+            ? new ValidationProblemDetails(error.Details.ToDictionary(d => d.Key, d => d.Value))
+            : new ProblemDetails();
+
+        problem.Status = status;
+        problem.Title = title;
+        problem.Detail = error.Message;
         problem.Extensions["code"] = error.Code;
         return new ObjectResult(problem) { StatusCode = status };
     }

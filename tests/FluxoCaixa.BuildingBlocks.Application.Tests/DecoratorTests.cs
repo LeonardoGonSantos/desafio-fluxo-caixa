@@ -109,3 +109,21 @@ public class DecoratorTests
         await _unitOfWork.DidNotReceiveWithAnyArgs().CommitAsync(default);
     }
 }
+
+public class ValidationDetailsTests
+{
+    [Fact]
+    public async Task Validation_ComandoInvalido_AgrupaMensagensPorCampoEmCamelCase()
+    {
+        var inner = Substitute.For<ICommandHandler<FakeCommand, string>>();
+        var decorator = new CommandValidationDecorator<FakeCommand, string>(inner, [new FakeCommandValidator()]);
+
+        var result = await decorator.Handle(new FakeCommand("", 0), CancellationToken.None);
+
+        var details = result.Error.Details.ShouldNotBeNull();
+        details.Keys.ShouldBe(["nome", "quantidade"], ignoreOrder: true);
+        details["nome"].ShouldBe(["Nome é obrigatório."]);
+        details["quantidade"].ShouldBe(["Quantidade deve ser positiva."]);
+        result.Error.Code.ShouldBe("validation.failed");
+    }
+}

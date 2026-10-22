@@ -225,6 +225,26 @@ public sealed class LancamentosApiTests : IDisposable
     }
 
     [Fact]
+    public async Task GetLancamentos_PeriodoInvertido_Retorna400ComErroPorCampo()
+    {
+        var response = await _client.GetAsync("/api/v1/lancamentos?de=2025-01-10&ate=2025-01-01");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().ShouldBe("validation.failed");
+        problem.GetProperty("errors").GetProperty("ate")[0].GetString()!.ShouldContain("data final");
+    }
+
+    [Fact]
+    public async Task PostLancamento_ValorZero_ERejeitadoPeloDominioComCodigoEstavel()
+    {
+        var response = await Post(Corpo(valor: 0m));
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().ShouldBe("lancamento.valor_invalido");
+    }
+
+    [Fact]
     public async Task GetLancamentos_SemPeriodo_Retorna400()
     {
         (await _client.GetAsync("/api/v1/lancamentos")).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
