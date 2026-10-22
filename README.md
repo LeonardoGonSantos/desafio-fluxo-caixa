@@ -184,6 +184,12 @@ dotnet test        # todos (os de integração sobem PostgreSQL e RabbitMQ reais
 | `Consolidacao.IntegrationTests` | integração | Consumo atualiza o saldo, **mensagem duplicada aplicada 1×**, **100 mensagens concorrentes → soma exata**, JSON inválido / tipo desconhecido → **DLQ**, **falha transitória repetida → tentativas contadas → DLQ**, **queda das conexões no broker → o consumo é restabelecido**, retroativo corrige o acumulado, relatório, `429` com `Retry-After`. |
 | `FluxoCaixa.ArchitectureTests` | arquitetura | Domain sem dependências de infra/framework; Application sem External/Api; **Lançamentos ⟂ Consolidação**; BuildingBlocks sem dependência de infraestrutura nem de serviços; handlers `sealed`; controllers só na camada Api. Inclui controle de sanidade contra regras vacuamente verdadeiras. |
 
+### Integração contínua
+
+O pipeline de CI (GitHub Actions) está em [`ci/github-actions.yml`](ci/github-actions.yml): restaura, compila em Release
+(warnings tratados como erro), executa toda a suíte de testes com cobertura (os de integração usam Testcontainers) e
+valida o build das imagens Docker. Para usá-lo em um repositório GitHub, copie o arquivo para `.github/workflows/ci.yml`.
+
 ### Teste de carga (50 req/s, perda máxima de 5%)
 
 Com a stack no ar (`docker compose up -d`), o k6 aplica **50 req/s constantes** no `GET /saldos-diarios/{data}` **enquanto**
@@ -285,6 +291,7 @@ Detalhes e justificativas: [ADR 0007](docs/adr/0007-data-de-competencia-e-fuso.m
 
 ```
 ├── docker-compose.yml            # postgres, rabbitmq, 2 APIs (+ k6 no profile "load")
+├── ci/github-actions.yml         # pipeline de CI (GitHub Actions)
 ├── docker/postgres/init/         # criação dos bancos
 ├── docs/
 │   ├── adr/                      # decisões de arquitetura
