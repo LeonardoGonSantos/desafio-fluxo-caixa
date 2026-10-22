@@ -52,8 +52,9 @@ public static class DependencyInjection
 
         // A ordem importa: as migrations rodam antes do consumidor.
         services.AddHostedService<MigrationHostedService>();
-        services.AddSingleton<LancamentoRegistradoConsumer>();
-        services.AddHostedService(sp => sp.GetRequiredService<LancamentoRegistradoConsumer>());
+        services.AddSingleton<ConsumerStatus>();
+        services.AddSingleton<LancamentoRegistradoMessageHandler>();
+        services.AddHostedService<RabbitMqConsumerHostedService>();
 
         return services;
     }

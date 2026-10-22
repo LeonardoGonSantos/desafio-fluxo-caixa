@@ -40,7 +40,7 @@ flowchart LR
     outbox -->|"publica<br/>(confirms + mandatory)"| ex
     ex --> q
     q -->|"at-least-once"| consumer
-    q -.->|"poison / delivery-limit"| dlq
+    q -.->|"poison / tentativas esgotadas"| dlq
     consumer -->|"1 transação:<br/>processed_events + saldo (FOR UPDATE)"| cdb
     lojista -->|"GET /saldos-diarios/{data}"| capi
     capi -->|"leitura"| cdb

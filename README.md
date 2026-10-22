@@ -301,7 +301,6 @@ Registradas com honestidade, como pontos de partida para evolução:
 - **Reconciliação**: não há job que recalcule `saldo_diario` a partir dos lançamentos para detectar divergências (descrito no ADR 0005).
 - **Invalidação de cache total** a cada consolidação. Correto (um retroativo muda o acumulado de todos os dias seguintes), mas reduz o aproveitamento do cache sob muita escrita; o ganho principal no pico é o coalescimento.
 - **Acumulado calculado com `SUM`** sobre todos os dias anteriores: O(dias). Suficiente aqui; com anos de histórico, usar snapshots/saldo de abertura mensal.
-- **Reentrega até o `delivery-limit` → DLQ** usa o comportamento nativo da *quorum queue*; os testes automatizados cobrem a rejeição direta (poison message) à DLQ, mas não esse caminho de falha transitória repetida.
 - **Sem política de reprocessamento da DLQ** (hoje, inspeção manual no painel do RabbitMQ).
 - Observabilidade limitada a logs estruturados (Serilog) com `X-Correlation-Id` e health checks; sem métricas/tracing distribuído.
 - Segredos de desenvolvimento em texto no `docker-compose.yml`/`appsettings` (apenas para o ambiente local).

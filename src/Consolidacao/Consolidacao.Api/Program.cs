@@ -12,6 +12,8 @@ builder.Services.AddSwagger();
 builder.Services.AddDefaultHealthChecks(
     builder.Configuration.GetConnectionString(Consolidacao.External.DependencyInjection.ConnectionStringName)!);
 
+builder.Services.AddHealthChecks().AddCheck<ConsumerHealthCheck>("consumer", tags: ["dependencies"]);
+
 var app = builder.Build();
 
 app.UseApiDefaults();

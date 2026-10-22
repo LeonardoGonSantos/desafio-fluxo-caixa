@@ -14,8 +14,12 @@ O broker entrega *at least once* (reentregas após falha, restart, nack). Um eve
 - **Ordem irrelevante:** somar créditos/débitos é comutativo. Lançamento retroativo (data de competência antiga) funciona sem tratamento especial;
   o **saldo acumulado é calculado na leitura** (`SUM` até a data), então dias posteriores se corrigem sozinhos.
 - **Falhas:** JSON inválido, tipo desconhecido ou violação de domínio ⇒ `nack(requeue:false)` ⇒ **DLQ** direto.
-  Falha transitória (banco indisponível) ⇒ `nack(requeue:true)` com pequeno atraso; a *quorum queue* com `x-delivery-limit`
-  envia para a DLQ após N entregas, evitando loop infinito.
+  Falha transitória (ex.: banco indisponível) ⇒ a aplicação **republica a mensagem na própria fila com `x-retry-count + 1`**
+  (após um atraso crescente) e confirma a original; ao atingir `MaxProcessingAttempts` ela vai para a **DLQ**.
+  Ordem importa: publica (com *confirm*) e só então confirma a original ⇒ no pior caso há duplicata (absorvida pela idempotência), nunca perda.
+  > **Por que não o `x-delivery-limit` da quorum queue?** Foi a primeira tentativa, e um teste com RabbitMQ 4 mostrou que
+  > `nack(requeue:true)` **não** incrementa a contagem usada pelo limite (a mensagem foi entregue 12× sem ir para a DLQ).
+  > Sem contagem na aplicação, uma mensagem "venenosa" ficaria em loop infinito.
 - **Cache:** invalidado **após o commit**. Um retroativo altera o acumulado de todos os dias seguintes, então a invalidação é total (tag).
 
 ## Consequências

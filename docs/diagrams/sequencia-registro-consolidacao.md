@@ -51,8 +51,8 @@ flowchart TD
     h --> ok{"resultado"}
     ok -- "sucesso / duplicata" --> ack["ack"]
     ok -- "violação de domínio" --> dlq
-    ok -- "exceção (ex.: banco fora)" --> r["nack(requeue:true) após pequeno atraso"]
-    r --> lim{"entregas ≥ delivery-limit?"}
+    ok -- "exceção (ex.: banco fora)" --> r["republica na fila com x-retry-count+1 após atraso; ack da original"]
+    r --> lim{"tentativas ≥ máximo?"}
     lim -- sim --> dlq
     lim -- não --> m
 ```

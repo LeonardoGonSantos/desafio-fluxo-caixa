@@ -29,9 +29,18 @@ public sealed class RabbitMqOptions : RabbitMqConnectionOptions
     [Range(1, 64)]
     public ushort Concurrency { get; set; } = 4;
 
-    /// <summary>Entregas máximas antes de a mensagem ir para a DLQ (quorum queue delivery-limit).</summary>
+    /// <summary>
+    /// Tentativas de processamento antes de enviar a mensagem para a DLQ. A contagem é feita pela aplicação (header
+    /// <c>x-retry-count</c>): no RabbitMQ 4, <c>nack(requeue)</c> NÃO conta para o <c>x-delivery-limit</c> da quorum queue.
+    /// </summary>
     [Range(1, 100)]
-    public int DeliveryLimit { get; set; } = 5;
+    public int MaxProcessingAttempts { get; set; } = 5;
 
+    /// <summary>Espera base entre tentativas; cresce linearmente (atraso × número da tentativa).</summary>
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Quanto esperar a recuperação automática do client depois de uma queda antes de recriar conexão e consumo do zero.
+    /// </summary>
+    public TimeSpan RecoveryGracePeriod { get; set; } = TimeSpan.FromSeconds(30);
 }

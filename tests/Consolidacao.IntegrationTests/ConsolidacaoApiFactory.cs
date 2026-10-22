@@ -2,6 +2,8 @@ using System.Text;
 using Dapper;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RabbitMQ.Client;
 
@@ -17,12 +19,15 @@ public sealed class ConsolidacaoApiFactory : WebApplicationFactory<Program>
 
     private readonly InfraFixture _infra;
     private readonly int _tokenLimit;
+    private readonly Action<IServiceCollection>? _overrideServices;
     private readonly string _id = Guid.NewGuid().ToString("N");
 
-    public ConsolidacaoApiFactory(InfraFixture infra, int tokenLimit = 10_000)
+    public ConsolidacaoApiFactory(
+        InfraFixture infra, int tokenLimit = 10_000, Action<IServiceCollection>? overrideServices = null)
     {
         _infra = infra;
         _tokenLimit = tokenLimit;
+        _overrideServices = overrideServices;
     }
 
     public string Exchange => $"fluxo.test.{_id}";
@@ -53,7 +58,13 @@ public sealed class ConsolidacaoApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("RabbitMq:DeadLetterExchange", $"fluxo.test.{_id}.dlx");
         builder.UseSetting("RabbitMq:DeadLetterQueue", DeadLetterQueue);
         builder.UseSetting("RabbitMq:RetryDelay", "00:00:00.100");
-        builder.UseSetting("RabbitMq:DeliveryLimit", "3");
+        builder.UseSetting("RabbitMq:MaxProcessingAttempts", "3");
+        builder.UseSetting("RabbitMq:RecoveryGracePeriod", "00:00:20");
+
+        if (_overrideServices is not null)
+        {
+            builder.ConfigureTestServices(_overrideServices);
+        }
     }
 
     public async Task<IChannel> CreateRabbitChannelAsync()
@@ -67,6 +78,16 @@ public sealed class ConsolidacaoApiFactory : WebApplicationFactory<Program>
         };
         var connection = await factory.CreateConnectionAsync();
         return await connection.CreateChannelAsync();
+    }
+
+    /// <summary>Simula uma queda de rede: o broker derruba todas as conexões abertas.</summary>
+    public async Task CloseAllBrokerConnectionsAsync()
+    {
+        var result = await _infra.Rabbit.ExecAsync(["rabbitmqctl", "close_all_connections", "queda simulada no teste"]);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"rabbitmqctl falhou: {result.Stderr}");
+        }
     }
 
     /// <summary>
