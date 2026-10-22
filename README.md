@@ -136,6 +136,10 @@ curl -s localhost:5002/api/v1/saldos-diarios/$HOJE
 # 4) Relatório de um período (um item por dia, com acumulado)
 curl -s "localhost:5002/api/v1/saldos-diarios?de=$(date -v-6d +%F)&ate=$HOJE"   # Linux: date -d '6 days ago' +%F
 
+# 4b) Listar lançamentos (paginação por cursor; repita com o nextCursor recebido até ele deixar de vir)
+curl -s "localhost:5001/api/v1/lancamentos?de=$HOJE&ate=$HOJE&pageSize=2"
+# {"items":[…2 itens…],"nextCursor":"MjAyNS…"}   →   …&cursor=MjAyNS…
+
 # 5) Estornar um lançamento (nunca se edita/exclui: cria um lançamento inverso)
 curl -s -X POST localhost:5001/api/v1/lancamentos/<ID>/estornos \
   -H 'Content-Type: application/json' -d '{"motivo":"Lançado por engano"}'
@@ -171,11 +175,13 @@ dotnet test        # todos (os de integração sobem PostgreSQL e RabbitMQ reais
 | `FluxoCaixa.BuildingBlocks.Tests` | unitário | `Money` (2 casas, não negativo, igualdade), `Result`. |
 | `FluxoCaixa.BuildingBlocks.Application.Tests` | unitário | Decorators de **validação** (não chama o handler, agrega mensagens) e de **transação** (commit/rollback, ordem begin→commit), com comando fictício. |
 | `Lancamentos.Domain.Tests` | unitário | Invariantes do `Lancamento`, regra de data no fuso de São Paulo, estorno (inverso, vínculo, duplo estorno, estorno de estorno), eventos de domínio. |
-| `Lancamentos.Application.Tests` | unitário | Handlers (persistência + outbox), validators, decorators de validação e **transação** (commit/rollback), mapper de eventos. |
+| `Lancamentos.Application.Tests` | unitário | Handlers (persistência + outbox), validators (só a forma da entrada), **cursor de paginação** (round-trip, entradas inválidas), handler da listagem (linha extra → `nextCursor`), mapper de eventos **exaustivo** (evento sem mapeamento lança exceção). |
+| `Lancamentos.External.Tests` | unitário | `OutboxProcessor` com store e publisher falsos (falha interrompe o lote, libera o resto, preserva a ordem, shutdown), política de resiliência (circuit breaker abre, **sem retry duplicado**, mensagem sem rota não abre o circuito, timeout) e **contrato do evento** (lado publicador). |
 | `Consolidacao.Domain.Tests` | unitário | `SaldoDiario`: soma, saldo negativo, **ordem dos movimentos não altera o resultado**. |
 | `Consolidacao.Application.Tests` | unitário | Idempotência do handler, saldo de dia sem movimento, relatório com dias vazios e acumulado, validação de datas. |
-| `Lancamentos.IntegrationTests` | integração | Migrations, `201`+`Location`, lançamento e outbox **na mesma transação**, **idempotência** (replay, corpo diferente → `422`, 8 requisições concorrentes → 1 lançamento), estorno concorrente (1 sucesso, 5 conflitos), **RabbitMQ fora do ar → `201`**, outbox publica/retém/reentrega. |
-| `Consolidacao.IntegrationTests` | integração | Consumo atualiza o saldo, **mensagem duplicada aplicada 1×**, **100 mensagens concorrentes → soma exata**, JSON inválido / tipo desconhecido → **DLQ**, retroativo corrige o acumulado, relatório, `429` com `Retry-After`. |
+| `Consolidacao.External.Tests` | unitário | `LancamentoRegistradoMessageHandler` (ack/rejeita/retry para cada tipo de mensagem, sem broker), `RecoveryWatchdog` (prazo de recuperação com relógio falso), contagem de tentativas e **contrato do evento** (lado consumidor, mesmo JSON do publicador — o teste quebra se um lado mudar o formato). |
+| `Lancamentos.IntegrationTests` | integração | Migrations, `201`+`Location`, lançamento e outbox **na mesma transação**, **idempotência** (replay, corpo diferente → `422`, 8 requisições concorrentes → 1 lançamento), estorno concorrente (1 sucesso, 5 conflitos), **RabbitMQ fora do ar → `201`**, outbox publica/retém/reentrega (com o loop em segundo plano ligado e desligado), **reserva com lease** (duas instâncias nunca pegam a mesma mensagem; lease expirado é reivindicado), store de idempotência (reserva concorrente → exatamente 1 `Acquired`; reserva abandonada é retomada), **paginação por cursor** sem repetir nem pular itens (inclusive com empate de data e instante), erros `400` por campo. |
+| `Consolidacao.IntegrationTests` | integração | Consumo atualiza o saldo, **mensagem duplicada aplicada 1×**, **100 mensagens concorrentes → soma exata**, JSON inválido / tipo desconhecido → **DLQ**, **falha transitória repetida → tentativas contadas → DLQ**, **queda das conexões no broker → o consumo é restabelecido**, retroativo corrige o acumulado, relatório, `429` com `Retry-After`. |
 | `FluxoCaixa.ArchitectureTests` | arquitetura | Domain sem dependências de infra/framework; Application sem External/Api; **Lançamentos ⟂ Consolidação**; BuildingBlocks sem dependência de infraestrutura nem de serviços; handlers `sealed`; controllers só na camada Api. Inclui controle de sanidade contra regras vacuamente verdadeiras. |
 
 ### Teste de carga (50 req/s, perda máxima de 5%)
@@ -194,8 +200,11 @@ Critérios (thresholds): `http_req_failed < 5%`, `p95 < 200 ms`, `p99 < 500 ms`.
 
 | Cenário | Requisições | Falhas | Latência (p95 / p99) |
 |---|---|---|---|
-| `leitura` — 50 req/s em `GET /saldos-diarios/{data}` | 3.001 | **0,00 %** (limite: 5 %) | **6,4 ms** / 22,6 ms (limites: 200 / 500 ms) |
-| `escrita` — 20 req/s em `POST /lancamentos` (em paralelo) | 1.201 | 0,00 % | não medido isoladamente (p95 geral das 2 cargas: 12,6 ms) |
+| `leitura` — 50 req/s em `GET /saldos-diarios/{data}` | 3.001 | **0,00 %** (limite: 5 %) | **5,2 ms** / 12,4 ms (limites: 200 / 500 ms) |
+| `escrita` — 20 req/s em `POST /lancamentos` (em paralelo) | 1.201 | 0,00 % | não medido isoladamente (p95 geral das 2 cargas: 10,4 ms) |
+
+**Corretude após a carga** (conferida no banco, não só na API): 1.206 lançamentos gravados = 1.206 eventos processados pela
+Consolidação; soma de créditos e de débitos **idêntica** nos dois bancos; outbox sem pendências; fila principal e DLQ vazias.
 
 Todos os thresholds passaram; nenhuma iteração descartada. Os números dependem da máquina — o objetivo é demonstrar a folga
 em relação ao requisito (50 req/s) e fornecer um teste reproduzível, não um *benchmark* absoluto.
@@ -210,6 +219,7 @@ em relação ao requisito (50 req/s) e fornecer um teste reproduzível, não um 
 - **Zero acoplamento síncrono**: Lançamentos nunca chama a Consolidação. A única integração é um evento.
 - **Transactional Outbox**: o lançamento e o evento são gravados na mesma transação (ADR 0002). Se o RabbitMQ ou a
   Consolidação estiverem fora, o evento espera no banco e é publicado depois, com *retry* exponencial e *circuit breaker* (Polly).
+- **Outbox sem transação aberta durante I/O**: o processador *reserva* as mensagens com um lease (transação curta), publica fora de transação e marca cada uma; se o processo morrer, o lease expira e outra instância reprocessa.
 - **Sem perda por fila inexistente**: a publicação usa `mandatory` + *publisher confirms*; se a Consolidação ainda não
   declarou sua fila, a mensagem não some — fica pendente no outbox.
 - **Readiness correto**: `/health/ready` depende só do PostgreSQL; broker indisponível apenas *degrada* `/health/dependencies`.
@@ -228,6 +238,7 @@ em relação ao requisito (50 req/s) e fornecer um teste reproduzível, não um 
 ### 3. Consistência e corretude
 
 - **Consumidor idempotente** (`processed_events` na mesma transação do saldo) e **sem perda de atualização** (`FOR UPDATE`) — ADR 0005.
+- **Falhas do consumidor tratadas**: mensagem inválida → DLQ direto; falha transitória → reenfileirada com contador de tentativas (`x-retry-count`) e, ao esgotar, DLQ; queda de conexão → recuperação automática do client com *watchdog* que recria o consumo se ela não ocorrer a tempo. Health check `consumer` degrada quando o consumo está parado.
 - **Estorno em vez de edição**: trilha de auditoria íntegra (ADR 0006).
 - **Idempotência na API**: header `Idempotency-Key` no `POST /lancamentos`; reserva a chave *antes* de executar, evitando a corrida de requisições simultâneas.
 
@@ -302,6 +313,8 @@ Registradas com honestidade, como pontos de partida para evolução:
 - **Invalidação de cache total** a cada consolidação. Correto (um retroativo muda o acumulado de todos os dias seguintes), mas reduz o aproveitamento do cache sob muita escrita; o ganho principal no pico é o coalescimento.
 - **Acumulado calculado com `SUM`** sobre todos os dias anteriores: O(dias). Suficiente aqui; com anos de histórico, usar snapshots/saldo de abertura mensal.
 - **Sem política de reprocessamento da DLQ** (hoje, inspeção manual no painel do RabbitMQ).
+- **A listagem de lançamentos não informa o total de itens**: a paginação por cursor evita o `count(*)` e o `OFFSET` (custo constante em qualquer página). Se o front precisar do total, o caminho é um endpoint de contagem separado.
+- **Publicação duplicada é possível** (processo cai entre publicar e marcar a mensagem; o lease expira e outra instância republica). É o *at-least-once* esperado e é absorvido pelo consumidor idempotente.
 - Observabilidade limitada a logs estruturados (Serilog) com `X-Correlation-Id` e health checks; sem métricas/tracing distribuído.
 - Segredos de desenvolvimento em texto no `docker-compose.yml`/`appsettings` (apenas para o ambiente local).
 

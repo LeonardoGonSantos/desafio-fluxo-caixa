@@ -23,38 +23,38 @@ public sealed class LancamentoQueries(DbSession session) : ILancamentoQueries
         return row?.ToResponse();
     }
 
-    public async Task<PagedResult<LancamentoResponse>> ListAsync(
-        DateOnly de, DateOnly ate, TipoLancamento? tipo, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<LancamentoResponse>> ListAsync(
+        DateOnly de, DateOnly ate, TipoLancamento? tipo, int limit, LancamentoCursor? after, CancellationToken cancellationToken)
     {
         var connection = await session.GetConnectionAsync(cancellationToken);
-        var parameters = new
-        {
-            de,
-            ate,
-            tipo = tipo.HasValue ? (short?)tipo.Value : null,
-            limit = pageSize,
-            offset = (page - 1) * pageSize,
-        };
 
-        const string filter = """
-            WHERE data_competencia BETWEEN @de AND @ate
-              AND (@tipo::smallint IS NULL OR tipo = @tipo::smallint)
-            """;
-
-        var total = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
-            $"SELECT count(*) FROM lancamentos {filter}", parameters, cancellationToken: cancellationToken));
+        // Comparação de linha (row value) casa com o índice (data_competencia, criado_em, id) DESC: sem OFFSET.
+        var cursorFilter = after is null
+            ? string.Empty
+            : "AND (data_competencia, criado_em, id) < (@cursorData, @cursorCriadoEm, @cursorId)";
 
         var rows = await connection.QueryAsync<Row>(new CommandDefinition(
             $"""
-             SELECT {Columns} FROM lancamentos {filter}
-             ORDER BY data_competencia DESC, criado_em DESC, id
-             LIMIT @limit OFFSET @offset
+             SELECT {Columns} FROM lancamentos
+             WHERE data_competencia BETWEEN @de AND @ate
+               AND (@tipo::smallint IS NULL OR tipo = @tipo::smallint)
+               {cursorFilter}
+             ORDER BY data_competencia DESC, criado_em DESC, id DESC
+             LIMIT @limit
              """,
-            parameters,
+            new
+            {
+                de,
+                ate,
+                tipo = tipo.HasValue ? (short?)tipo.Value : null,
+                limit,
+                cursorData = after?.DataCompetencia,
+                cursorCriadoEm = after?.CriadoEm,
+                cursorId = after?.Id,
+            },
             cancellationToken: cancellationToken));
 
-        return new PagedResult<LancamentoResponse>(
-            rows.Select(r => r.ToResponse()).ToList(), page, pageSize, total);
+        return rows.Select(r => r.ToResponse()).ToList();
     }
 
     private sealed record Row(

@@ -9,6 +9,10 @@ public interface ILancamentoQueries
 {
     Task<LancamentoResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<PagedResult<LancamentoResponse>> ListAsync(
-        DateOnly de, DateOnly ate, TipoLancamento? tipo, int page, int pageSize, CancellationToken cancellationToken);
+    /// <summary>
+    /// Lista em ordem decrescente de (data de competência, criação, id), a partir da posição seguinte a
+    /// <paramref name="after"/> (ou do início, se nulo). Paginação por chave: custo constante em qualquer página.
+    /// </summary>
+    Task<IReadOnlyList<LancamentoResponse>> ListAsync(
+        DateOnly de, DateOnly ate, TipoLancamento? tipo, int limit, LancamentoCursor? after, CancellationToken cancellationToken);
 }

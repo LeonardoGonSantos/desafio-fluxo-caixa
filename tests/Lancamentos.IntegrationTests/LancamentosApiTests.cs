@@ -210,18 +210,72 @@ public sealed class LancamentosApiTests : IDisposable
     }
 
     [Fact]
-    public async Task GetLancamentos_PorPeriodo_RetornaPaginado()
+    public async Task GetLancamentos_PaginaPorCursor_PercorreTudoSemRepetirNemPular()
     {
-        for (var i = 0; i < 3; i++)
+        var prefixo = $"Paginado {Guid.NewGuid():N}";
+        for (var i = 0; i < 5; i++)
         {
-            await Post(Corpo(descricao: $"Item de lista {i}"));
+            (await Post(Corpo(descricao: $"{prefixo} {i}"))).StatusCode.ShouldBe(HttpStatusCode.Created);
         }
 
         var dia = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)).ToString("yyyy-MM-dd");
-        var page = await _client.GetFromJsonAsync<JsonElement>($"/api/v1/lancamentos?de={dia}&ate={dia}&page=1&pageSize=2");
+        var vistos = new List<string>();
+        string? cursor = null;
+        var paginas = 0;
+        do
+        {
+            var url = $"/api/v1/lancamentos?de={dia}&ate={dia}&pageSize=2" + (cursor is null ? "" : $"&cursor={cursor}");
+            var page = await _client.GetFromJsonAsync<JsonElement>(url);
+            vistos.AddRange(page.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString()!));
+            cursor = page.TryGetProperty("nextCursor", out var next) && next.ValueKind == JsonValueKind.String ? next.GetString() : null;
+            paginas++;
+        }
+        while (cursor is not null && paginas < 20);
 
-        page.GetProperty("items").GetArrayLength().ShouldBe(2);
-        page.GetProperty("totalItems").GetInt64().ShouldBeGreaterThanOrEqualTo(3);
+        vistos.Count.ShouldBe(vistos.Distinct().Count());   // nenhum repetido
+        vistos.Count.ShouldBeGreaterThanOrEqualTo(5);        // nenhum pulado (os 5 criados + eventuais de outros testes)
+        paginas.ShouldBeGreaterThanOrEqualTo(3);
+    }
+
+    [Fact]
+    public async Task GetLancamentos_CursorInvalido_Retorna400ComErroNoCampo()
+    {
+        var response = await _client.GetAsync("/api/v1/lancamentos?de=2025-01-01&ate=2025-01-02&cursor=lixo");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").GetProperty("cursor")[0].GetString().ShouldBe("Cursor inválido.");
+    }
+
+    [Fact]
+    public async Task GetLancamentos_MesmaDataECriacao_OrdemEstavelPorId()
+    {
+        // Lançamentos com a mesma data de competência e o mesmo instante de criação: o id desempata.
+        await using var connection = new Npgsql.NpgsqlConnection(_factory.ConnectionString);
+        (await _client.GetAsync("/health/live")).EnsureSuccessStatusCode();
+        var instante = DateTimeOffset.UtcNow.AddHours(-1);
+        for (var i = 0; i < 5; i++)
+        {
+            await Dapper.SqlMapper.ExecuteAsync(connection,
+                """
+                INSERT INTO lancamentos (id, tipo, valor, descricao, data_competencia, status, criado_em)
+                VALUES (@id, 1, 1.00, 'Empate de ordenação', '2024-03-15', 1, @instante)
+                """,
+                new { id = Guid.NewGuid(), instante });
+        }
+
+        var vistos = new List<string>();
+        string? cursor = null;
+        do
+        {
+            var url = "/api/v1/lancamentos?de=2024-03-15&ate=2024-03-15&pageSize=2" + (cursor is null ? "" : $"&cursor={cursor}");
+            var page = await _client.GetFromJsonAsync<JsonElement>(url);
+            vistos.AddRange(page.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString()!));
+            cursor = page.TryGetProperty("nextCursor", out var next) && next.ValueKind == JsonValueKind.String ? next.GetString() : null;
+        }
+        while (cursor is not null);
+
+        vistos.Count.ShouldBe(5);
+        vistos.Distinct().Count().ShouldBe(5);
     }
 
     [Fact]

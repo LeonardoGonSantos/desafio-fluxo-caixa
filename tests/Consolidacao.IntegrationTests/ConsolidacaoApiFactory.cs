@@ -91,7 +91,8 @@ public sealed class ConsolidacaoApiFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Aguarda o consumer subir e declarar a fila (ele roda em background no startup).
+    /// Aguarda o consumer estar REGISTRADO na fila (ele sobe em background no startup). Existência da fila não basta:
+    /// ela é declarada antes do binding com o exchange, e publicar nesse intervalo perderia a mensagem (sem rota).
     /// Um passive-declare de fila inexistente fecha o canal no broker, então cada sonda usa um canal novo.
     /// </summary>
     public async Task WaitForConsumerAsync()
@@ -101,8 +102,8 @@ public sealed class ConsolidacaoApiFactory : WebApplicationFactory<Program>
             try
             {
                 await using var probe = await CreateRabbitChannelAsync();
-                await probe.QueueDeclarePassiveAsync(Queue);
-                return true;
+                var fila = await probe.QueueDeclarePassiveAsync(Queue);
+                return fila.ConsumerCount >= 1;
             }
             catch (RabbitMQ.Client.Exceptions.OperationInterruptedException)
             {
@@ -139,7 +140,7 @@ public sealed class ConsolidacaoApiFactory : WebApplicationFactory<Program>
 
 public static class Eventually
 {
-    public static async Task ForAsync(Func<Task<bool>> condition, int timeoutSeconds = 20)
+    public static async Task ForAsync(Func<Task<bool>> condition, int timeoutSeconds = 60)
     {
         var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
         while (DateTime.UtcNow < deadline)

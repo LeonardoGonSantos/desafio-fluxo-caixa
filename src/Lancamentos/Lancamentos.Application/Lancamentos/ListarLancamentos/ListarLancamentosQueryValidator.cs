@@ -1,4 +1,5 @@
 using FluentValidation;
+using Lancamentos.Application.Common;
 
 namespace Lancamentos.Application.Lancamentos.ListarLancamentos;
 
@@ -15,8 +16,11 @@ public sealed class ListarLancamentosQueryValidator : AbstractValidator<ListarLa
             .When(q => q.Ate >= q.De)
             .WithMessage($"O período máximo de consulta é de {MaximoDiasPeriodo} dias.");
         RuleFor(q => q.Tipo).IsInEnum().When(q => q.Tipo.HasValue);
-        RuleFor(q => q.Page).GreaterThanOrEqualTo(1).WithMessage("Page deve ser maior ou igual a 1.");
         RuleFor(q => q.PageSize).InclusiveBetween(1, MaximoPageSize)
             .WithMessage($"PageSize deve estar entre 1 e {MaximoPageSize}.");
+        RuleFor(q => q.Cursor)
+            .Must(cursor => LancamentoCursor.TryDecode(cursor, out _))
+            .When(q => q.Cursor is not null)
+            .WithMessage("Cursor inválido.");
     }
 }

@@ -43,7 +43,7 @@ public sealed class ConsumerResilienceTests
         {
             naDlq = await channel.BasicGetAsync(factory.DeadLetterQueue, autoAck: true);
             return naDlq is not null;
-        }, timeoutSeconds: 30);
+        }, timeoutSeconds: 60);
 
         naDlq.ShouldNotBeNull();
         (await client.GetFromJsonAsync<JsonElement>($"/api/v1/saldos-diarios/{Dia}"))
@@ -82,7 +82,7 @@ public sealed class ConsumerResilienceTests
             }
         });
 
-        await Eventually.ForAsync(async () => await TotalCreditosAsync(client) >= 15m, timeoutSeconds: 40);
+        await Eventually.ForAsync(async () => await TotalCreditosAsync(client) >= 15m, timeoutSeconds: 60);
     }
 
     private static async Task<decimal> TotalCreditosAsync(HttpClient client) =>

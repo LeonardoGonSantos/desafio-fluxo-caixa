@@ -1,3 +1,4 @@
+using Lancamentos.Application.Common;
 using Lancamentos.Application.Lancamentos.ListarLancamentos;
 using Lancamentos.Application.Lancamentos.RegistrarLancamento;
 using Lancamentos.Domain.Lancamentos;
@@ -41,9 +42,25 @@ public class ValidatorTests
 
     [Fact]
     public void Listar_PageSizeMaiorQue100_Falha() =>
-        _listar.Validate(new ListarLancamentosQuery(Hoje, Hoje, null, 1, 101)).IsValid.ShouldBeFalse();
+        _listar.Validate(new ListarLancamentosQuery(Hoje, Hoje, null, 101)).IsValid.ShouldBeFalse();
 
     [Fact]
-    public void Listar_PageZero_Falha() =>
-        _listar.Validate(new ListarLancamentosQuery(Hoje, Hoje, null, 0, 20)).IsValid.ShouldBeFalse();
+    public void Listar_PageSizeZero_Falha() =>
+        _listar.Validate(new ListarLancamentosQuery(Hoje, Hoje, null, 0)).IsValid.ShouldBeFalse();
+
+    [Fact]
+    public void Listar_CursorMalformado_Falha() =>
+        _listar.Validate(new ListarLancamentosQuery(Hoje, Hoje, null, 20, "isto-nao-e-um-cursor")).IsValid.ShouldBeFalse();
+
+    [Fact]
+    public void Listar_CursorValido_Passa()
+    {
+        var cursor = new LancamentoCursor(Hoje, DateTimeOffset.UtcNow, Guid.NewGuid()).Encode();
+
+        _listar.Validate(new ListarLancamentosQuery(Hoje, Hoje, null, 20, cursor)).IsValid.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Listar_SemCursor_PrimeiraPagina_Passa() =>
+        _listar.Validate(new ListarLancamentosQuery(Hoje, Hoje, null)).IsValid.ShouldBeTrue();
 }

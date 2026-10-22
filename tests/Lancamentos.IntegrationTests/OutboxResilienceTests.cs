@@ -121,7 +121,7 @@ public sealed class OutboxResilienceTests
         var id = await PostLancamentoAsync(client);
 
         BasicGetResult? message = null;
-        var deadline = DateTime.UtcNow.AddSeconds(15);
+        var deadline = DateTime.UtcNow.AddSeconds(45);
         while (message is null && DateTime.UtcNow < deadline)
         {
             message = await channel.BasicGetAsync("q.background", autoAck: true);

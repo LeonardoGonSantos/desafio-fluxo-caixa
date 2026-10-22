@@ -21,7 +21,7 @@ public sealed class LancamentosController(
     ICommandHandler<RegistrarLancamentoCommand, LancamentoResponse> registrar,
     ICommandHandler<EstornarLancamentoCommand, LancamentoResponse> estornar,
     IQueryHandler<ObterLancamentoPorIdQuery, LancamentoResponse> obterPorId,
-    IQueryHandler<ListarLancamentosQuery, PagedResult<LancamentoResponse>> listar) : ControllerBase
+    IQueryHandler<ListarLancamentosQuery, CursorPage<LancamentoResponse>> listar) : ControllerBase
 {
     /// <summary>Registra um crédito ou débito no fluxo de caixa.</summary>
     /// <remarks>
@@ -65,19 +65,24 @@ public sealed class LancamentosController(
         return this.ToActionResult(result, Ok);
     }
 
-    /// <summary>Lista lançamentos por período de competência (máximo 93 dias), paginado.</summary>
+    /// <summary>Lista lançamentos por período de competência (máximo 93 dias), paginado por cursor.</summary>
+    /// <remarks>
+    /// Mais recentes primeiro. Para a próxima página, repita a chamada com o <c>nextCursor</c> recebido no parâmetro
+    /// <c>cursor</c> (opaco; ausente na última página).
+    /// </remarks>
+    /// <param name="cursor">Cursor devolvido em <c>nextCursor</c> pela página anterior.</param>
     [HttpGet]
-    [ProducesResponseType<PagedResult<LancamentoResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<CursorPage<LancamentoResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Listar(
         [FromQuery, BindRequired] DateOnly de,
         [FromQuery, BindRequired] DateOnly ate,
         [FromQuery] TipoLancamento? tipo,
         CancellationToken cancellationToken,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? cursor = null)
     {
-        var result = await listar.Handle(new ListarLancamentosQuery(de, ate, tipo, page, pageSize), cancellationToken);
+        var result = await listar.Handle(new ListarLancamentosQuery(de, ate, tipo, pageSize, cursor), cancellationToken);
         return this.ToActionResult(result, Ok);
     }
 

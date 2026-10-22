@@ -18,4 +18,7 @@
     </PackageReference>
   </ItemGroup>
   <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <None Include="../contracts/*.json" Link="contracts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
