@@ -1,10 +1,9 @@
-using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
-namespace Lancamentos.External.Messaging;
+namespace FluxoCaixa.BuildingBlocks.Infrastructure.Messaging;
 
 /// <summary>Mantém uma única conexão (com recovery automático) e a recria se for perdida.</summary>
-public sealed class RabbitMqConnectionProvider(IOptions<RabbitMqOptions> options) : IAsyncDisposable
+public sealed class RabbitMqConnectionProvider(RabbitMqConnectionOptions options, string clientName) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
@@ -30,7 +29,7 @@ public sealed class RabbitMqConnectionProvider(IOptions<RabbitMqOptions> options
                 _connection = null;
             }
 
-            var o = options.Value;
+            var o = options;
             var factory = new ConnectionFactory
             {
                 HostName = o.Host,
@@ -38,7 +37,7 @@ public sealed class RabbitMqConnectionProvider(IOptions<RabbitMqOptions> options
                 UserName = o.Username,
                 Password = o.Password,
                 VirtualHost = o.VirtualHost,
-                ClientProvidedName = "lancamentos-api",
+                ClientProvidedName = clientName,
                 AutomaticRecoveryEnabled = true,
                 RequestedConnectionTimeout = TimeSpan.FromSeconds(5),
             };

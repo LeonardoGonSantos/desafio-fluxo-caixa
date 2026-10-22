@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Consolidacao.External.Database;
+namespace FluxoCaixa.BuildingBlocks.Infrastructure.Database;
 
 /// <summary>Roda as migrations no startup, com retry enquanto o Postgres sobe.</summary>
 public sealed class MigrationHostedService(

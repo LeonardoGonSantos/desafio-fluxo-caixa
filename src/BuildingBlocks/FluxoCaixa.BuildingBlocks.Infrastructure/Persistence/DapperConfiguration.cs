@@ -1,7 +1,7 @@
 using System.Data;
 using Dapper;
 
-namespace Lancamentos.External.Persistence;
+namespace FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 
 public static class DapperConfiguration
 {

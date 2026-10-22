@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Lancamentos.Api.Infrastructure;
+namespace FluxoCaixa.BuildingBlocks.Api;
 
 public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IProblemDetailsService problemDetails)
     : IExceptionHandler

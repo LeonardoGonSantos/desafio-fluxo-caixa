@@ -5,6 +5,8 @@ using Polly;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
 
+using FluxoCaixa.BuildingBlocks.Infrastructure.Messaging;
+
 namespace Lancamentos.External.Messaging;
 
 public sealed class RabbitMqPublisher(

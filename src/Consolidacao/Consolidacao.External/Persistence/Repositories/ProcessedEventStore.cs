@@ -1,5 +1,6 @@
 using Consolidacao.Application.Abstractions;
 using Dapper;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 
 namespace Consolidacao.External.Persistence.Repositories;
 

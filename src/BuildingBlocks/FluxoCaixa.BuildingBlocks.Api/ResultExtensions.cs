@@ -1,7 +1,7 @@
 using FluxoCaixa.BuildingBlocks.Results;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Consolidacao.Api.Infrastructure;
+namespace FluxoCaixa.BuildingBlocks.Api;
 
 public static class ResultExtensions
 {

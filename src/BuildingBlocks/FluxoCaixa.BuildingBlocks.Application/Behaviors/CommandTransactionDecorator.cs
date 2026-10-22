@@ -1,8 +1,8 @@
 using FluxoCaixa.BuildingBlocks.Cqrs;
 using FluxoCaixa.BuildingBlocks.Results;
-using Lancamentos.Application.Abstractions;
+using FluxoCaixa.BuildingBlocks.Application.Abstractions;
 
-namespace Lancamentos.Application.Behaviors;
+namespace FluxoCaixa.BuildingBlocks.Application.Behaviors;
 
 /// <summary>Executa o comando dentro de uma transação: commit só em caso de sucesso.</summary>
 public sealed class CommandTransactionDecorator<TCommand, TResponse>(

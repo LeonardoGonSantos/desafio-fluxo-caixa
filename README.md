@@ -66,7 +66,7 @@ Diagramas completos (C4, camadas, sequência e tratamento de falhas): [docs/diag
 | `*.Application` | **Casos de uso em CQRS**: `Command/Query` + `Handler` + `Validator`. Decorators de logging, validação e transação. Portas (interfaces) de infraestrutura. |
 | `*.Domain` | **DDD**: Aggregate Roots (`Lancamento`, `SaldoDiario`), Value Objects (`Money`, `Descricao`), eventos de domínio, interfaces de repositório e erros de negócio. Sem dependência de framework. |
 | `*.External` | Infraestrutura: repositórios e queries **Dapper**, scripts SQL + **DbUp**, RabbitMQ, Outbox, cache, resiliência (Polly). Implementa as interfaces do Domain/Application. |
-| `FluxoCaixa.BuildingBlocks` | *Shared Kernel* mínimo: `Entity`, `AggregateRoot`, `ValueObject`, `Money`, `Result`, interfaces CQRS. |
+| `FluxoCaixa.BuildingBlocks` (+ `.Application`, `.Infrastructure`, `.Api`) | *Shared Kernel* mínimo (`Entity`, `AggregateRoot`, `ValueObject`, `Money`, `Result`, interfaces CQRS) e a infraestrutura comum aos dois serviços, separada por motivo de mudança: decorators e `AddCqrs`; sessão Dapper/migrator DbUp/conexão RabbitMQ; `ProblemDetails`, correlação e health checks. [ADR 0008](docs/adr/0008-shared-kernel-minimo.md). |
 
 A regra de dependência (`Api → Application → Domain`, `External → Application/Domain`, serviços nunca se referenciam)
 é **verificada por testes de arquitetura** (NetArchTest) a cada build.
@@ -169,13 +169,14 @@ dotnet test        # todos (os de integração sobem PostgreSQL e RabbitMQ reais
 | Projeto | Tipo | O que garante |
 |---|---|---|
 | `FluxoCaixa.BuildingBlocks.Tests` | unitário | `Money` (2 casas, não negativo, igualdade), `Result`. |
+| `FluxoCaixa.BuildingBlocks.Application.Tests` | unitário | Decorators de **validação** (não chama o handler, agrega mensagens) e de **transação** (commit/rollback, ordem begin→commit), com comando fictício. |
 | `Lancamentos.Domain.Tests` | unitário | Invariantes do `Lancamento`, regra de data no fuso de São Paulo, estorno (inverso, vínculo, duplo estorno, estorno de estorno), eventos de domínio. |
 | `Lancamentos.Application.Tests` | unitário | Handlers (persistência + outbox), validators, decorators de validação e **transação** (commit/rollback), mapper de eventos. |
 | `Consolidacao.Domain.Tests` | unitário | `SaldoDiario`: soma, saldo negativo, **ordem dos movimentos não altera o resultado**. |
 | `Consolidacao.Application.Tests` | unitário | Idempotência do handler, saldo de dia sem movimento, relatório com dias vazios e acumulado, validação de datas. |
 | `Lancamentos.IntegrationTests` | integração | Migrations, `201`+`Location`, lançamento e outbox **na mesma transação**, **idempotência** (replay, corpo diferente → `422`, 8 requisições concorrentes → 1 lançamento), estorno concorrente (1 sucesso, 5 conflitos), **RabbitMQ fora do ar → `201`**, outbox publica/retém/reentrega. |
 | `Consolidacao.IntegrationTests` | integração | Consumo atualiza o saldo, **mensagem duplicada aplicada 1×**, **100 mensagens concorrentes → soma exata**, JSON inválido / tipo desconhecido → **DLQ**, retroativo corrige o acumulado, relatório, `429` com `Retry-After`. |
-| `FluxoCaixa.ArchitectureTests` | arquitetura | Domain sem dependências de infra/framework; Application sem External/Api; **Lançamentos ⟂ Consolidação**; handlers `sealed`; controllers só na camada Api. Inclui controle de sanidade contra regras vacuamente verdadeiras. |
+| `FluxoCaixa.ArchitectureTests` | arquitetura | Domain sem dependências de infra/framework; Application sem External/Api; **Lançamentos ⟂ Consolidação**; BuildingBlocks sem dependência de infraestrutura nem de serviços; handlers `sealed`; controllers só na camada Api. Inclui controle de sanidade contra regras vacuamente verdadeiras. |
 
 ### Teste de carga (50 req/s, perda máxima de 5%)
 
@@ -278,7 +279,7 @@ Detalhes e justificativas: [ADR 0007](docs/adr/0007-data-de-competencia-e-fuso.m
 │   ├── adr/                      # decisões de arquitetura
 │   ├── diagrams/                 # C4, camadas, sequência (Mermaid)
 ├── src/
-│   ├── BuildingBlocks/FluxoCaixa.BuildingBlocks/
+│   ├── BuildingBlocks/                  # Kernel + .Application + .Infrastructure + .Api
 │   ├── Lancamentos/{Domain,Application,External,Api}/
 │   │   └── Lancamentos.External/Database/Scripts/   # 0001_*.sql … (DbUp)
 │   └── Consolidacao/{Domain,Application,External,Api}/

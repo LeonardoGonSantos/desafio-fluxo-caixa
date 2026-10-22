@@ -1,6 +1,7 @@
 using FluxoCaixa.BuildingBlocks.Cqrs;
 using Lancamentos.Api.Contracts;
 using Lancamentos.Api.Filters;
+using FluxoCaixa.BuildingBlocks.Api;
 using Lancamentos.Api.Infrastructure;
 using Lancamentos.Application.Common;
 using Lancamentos.Application.Lancamentos;

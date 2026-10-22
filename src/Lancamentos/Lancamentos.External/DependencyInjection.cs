@@ -1,9 +1,7 @@
 using Lancamentos.Application.Abstractions;
-using Lancamentos.External.Database;
 using Lancamentos.External.Idempotency;
 using Lancamentos.External.Messaging;
 using Lancamentos.External.Outbox;
-using Lancamentos.External.Persistence;
 using Lancamentos.External.Persistence.Queries;
 using Lancamentos.External.Persistence.Repositories;
 using Lancamentos.Domain.Lancamentos;
@@ -12,7 +10,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
+using FluxoCaixa.BuildingBlocks.Application.Abstractions;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Database;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Messaging;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 
 namespace Lancamentos.External;
 
@@ -46,10 +49,12 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddSingleton<RabbitMqConnectionProvider>();
+        services.AddSingleton(sp => new RabbitMqConnectionProvider(
+            sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value, "lancamentos-api"));
         services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
 
-        services.AddSingleton(sp => new DatabaseMigrator(connectionString, sp.GetRequiredService<ILogger<DatabaseMigrator>>()));
+        services.AddSingleton(sp => new DatabaseMigrator(
+            connectionString, typeof(DependencyInjection).Assembly, sp.GetRequiredService<ILogger<DatabaseMigrator>>()));
 
         // A ordem importa: as migrations rodam antes do processador de outbox.
         services.AddHostedService<MigrationHostedService>();

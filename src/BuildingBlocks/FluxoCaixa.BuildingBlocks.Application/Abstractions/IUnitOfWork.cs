@@ -1,4 +1,4 @@
-namespace Lancamentos.Application.Abstractions;
+namespace FluxoCaixa.BuildingBlocks.Application.Abstractions;
 
 public interface IUnitOfWork
 {

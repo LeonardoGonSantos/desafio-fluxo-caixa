@@ -4,6 +4,9 @@ WORKDIR /src
 # Restore em camada separada para aproveitar o cache de build
 COPY global.json Directory.Build.props Directory.Packages.props nuget.config ./
 COPY src/BuildingBlocks/FluxoCaixa.BuildingBlocks/*.csproj src/BuildingBlocks/FluxoCaixa.BuildingBlocks/
+COPY src/BuildingBlocks/FluxoCaixa.BuildingBlocks.Application/*.csproj src/BuildingBlocks/FluxoCaixa.BuildingBlocks.Application/
+COPY src/BuildingBlocks/FluxoCaixa.BuildingBlocks.Infrastructure/*.csproj src/BuildingBlocks/FluxoCaixa.BuildingBlocks.Infrastructure/
+COPY src/BuildingBlocks/FluxoCaixa.BuildingBlocks.Api/*.csproj src/BuildingBlocks/FluxoCaixa.BuildingBlocks.Api/
 COPY src/Lancamentos/Lancamentos.Domain/*.csproj src/Lancamentos/Lancamentos.Domain/
 COPY src/Lancamentos/Lancamentos.Application/*.csproj src/Lancamentos/Lancamentos.Application/
 COPY src/Lancamentos/Lancamentos.External/*.csproj src/Lancamentos/Lancamentos.External/

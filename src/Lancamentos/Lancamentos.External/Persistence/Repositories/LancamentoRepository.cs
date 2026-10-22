@@ -1,4 +1,5 @@
 using Dapper;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 using Lancamentos.Domain.Lancamentos;
 
 namespace Lancamentos.External.Persistence.Repositories;

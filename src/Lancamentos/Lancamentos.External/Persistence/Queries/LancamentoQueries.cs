@@ -1,4 +1,5 @@
 using Dapper;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 using Lancamentos.Application.Abstractions;
 using Lancamentos.Application.Common;
 using Lancamentos.Application.Lancamentos;

@@ -12,6 +12,8 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
+using FluxoCaixa.BuildingBlocks.Infrastructure.Messaging;
+
 namespace Consolidacao.External.Messaging;
 
 public enum MessageOutcome

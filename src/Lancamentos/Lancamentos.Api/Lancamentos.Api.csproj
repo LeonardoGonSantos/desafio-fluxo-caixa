@@ -2,10 +2,9 @@
   <ItemGroup>
     <ProjectReference Include="../Lancamentos.Application/Lancamentos.Application.csproj" />
     <ProjectReference Include="../Lancamentos.External/Lancamentos.External.csproj" />
+    <ProjectReference Include="../../BuildingBlocks/FluxoCaixa.BuildingBlocks.Api/FluxoCaixa.BuildingBlocks.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
-    <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
   <ItemGroup>

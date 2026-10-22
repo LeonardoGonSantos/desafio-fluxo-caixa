@@ -1,7 +1,7 @@
-using Consolidacao.External.Messaging;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Messaging;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace Consolidacao.Api.Infrastructure;
+namespace FluxoCaixa.BuildingBlocks.Api;
 
 /// <summary>
 /// Broker indisponível degrada, mas não derruba, o serviço: lançamentos continuam sendo aceitos

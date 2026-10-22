@@ -3,7 +3,7 @@ using FluxoCaixa.BuildingBlocks.Cqrs;
 using FluxoCaixa.BuildingBlocks.Results;
 using Microsoft.Extensions.Logging;
 
-namespace Consolidacao.Application.Behaviors;
+namespace FluxoCaixa.BuildingBlocks.Application.Behaviors;
 
 public sealed class CommandLoggingDecorator<TCommand, TResponse>(
     ICommandHandler<TCommand, TResponse> inner,

@@ -1,6 +1,6 @@
-using Consolidacao.Application.Abstractions;
+using FluxoCaixa.BuildingBlocks.Application.Abstractions;
 
-namespace Consolidacao.External.Persistence;
+namespace FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 
 public sealed class UnitOfWork(DbSession session) : IUnitOfWork
 {

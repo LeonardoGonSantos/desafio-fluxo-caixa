@@ -1,10 +1,14 @@
+using System.Reflection;
 using DbUp;
 using Microsoft.Extensions.Logging;
 
-namespace Lancamentos.External.Database;
+namespace FluxoCaixa.BuildingBlocks.Infrastructure.Database;
 
-/// <summary>Aplica os scripts SQL embutidos (Database/Scripts) em ordem; cada um roda uma única vez.</summary>
-public sealed class DatabaseMigrator(string connectionString, ILogger<DatabaseMigrator> logger)
+/// <summary>
+/// Aplica, em ordem, os scripts SQL embutidos em <c>*.Database.Scripts.*</c> do assembly informado;
+/// cada script roda uma única vez (tabela schemaversions do DbUp).
+/// </summary>
+public sealed class DatabaseMigrator(string connectionString, Assembly scriptsAssembly, ILogger<DatabaseMigrator> logger)
 {
     public void Migrate()
     {
@@ -13,7 +17,7 @@ public sealed class DatabaseMigrator(string connectionString, ILogger<DatabaseMi
         var upgrader = DeployChanges.To
             .PostgresqlDatabase(connectionString)
             .WithScriptsEmbeddedInAssembly(
-                typeof(DatabaseMigrator).Assembly,
+                scriptsAssembly,
                 name => name.Contains(".Database.Scripts.", StringComparison.Ordinal))
             .LogToNowhere()
             .Build();

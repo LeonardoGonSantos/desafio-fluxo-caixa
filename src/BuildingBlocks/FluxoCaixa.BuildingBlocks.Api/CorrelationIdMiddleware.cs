@@ -1,6 +1,6 @@
 using Serilog.Context;
 
-namespace Consolidacao.Api.Infrastructure;
+namespace FluxoCaixa.BuildingBlocks.Api;
 
 public sealed class CorrelationIdMiddleware(RequestDelegate next)
 {

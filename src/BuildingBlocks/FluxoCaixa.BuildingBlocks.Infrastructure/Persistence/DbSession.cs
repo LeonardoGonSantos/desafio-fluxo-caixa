@@ -1,7 +1,7 @@
 using System.Data.Common;
 using Npgsql;
 
-namespace Lancamentos.External.Persistence;
+namespace FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 
 /// <summary>
 /// Conexão + transação por escopo de requisição. Repositórios, outbox e queries

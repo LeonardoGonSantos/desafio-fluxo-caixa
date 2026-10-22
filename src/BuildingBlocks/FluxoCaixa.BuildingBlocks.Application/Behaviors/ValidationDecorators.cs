@@ -2,7 +2,7 @@ using FluentValidation;
 using FluxoCaixa.BuildingBlocks.Cqrs;
 using FluxoCaixa.BuildingBlocks.Results;
 
-namespace Consolidacao.Application.Behaviors;
+namespace FluxoCaixa.BuildingBlocks.Application.Behaviors;
 
 internal static class ValidationRunner
 {

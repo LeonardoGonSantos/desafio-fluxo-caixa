@@ -1,3 +1,4 @@
+using FluxoCaixa.BuildingBlocks.Api;
 using Consolidacao.Api.Infrastructure;
 using Consolidacao.Application.SaldosDiarios;
 using Consolidacao.Application.SaldosDiarios.ObterRelatorioPeriodo;

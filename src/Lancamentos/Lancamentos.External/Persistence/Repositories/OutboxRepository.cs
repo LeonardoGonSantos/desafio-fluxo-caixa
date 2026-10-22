@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Dapper;
+using FluxoCaixa.BuildingBlocks.Infrastructure.Persistence;
 using Lancamentos.Application.Abstractions;
 
 namespace Lancamentos.External.Persistence.Repositories;

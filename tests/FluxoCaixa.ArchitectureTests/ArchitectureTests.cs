@@ -64,6 +64,43 @@ public class ArchitectureTests
         result.IsSuccessful.ShouldBeTrue(Falhas(result));
     }
 
+    private static readonly Assembly KernelAssembly = typeof(FluxoCaixa.BuildingBlocks.Domain.Money).Assembly;
+    private static readonly Assembly BuildingBlocksApplication = typeof(FluxoCaixa.BuildingBlocks.Application.CqrsRegistration).Assembly;
+    private static readonly Assembly BuildingBlocksInfrastructure = typeof(FluxoCaixa.BuildingBlocks.Infrastructure.Persistence.DbSession).Assembly;
+    private static readonly Assembly BuildingBlocksApi = typeof(FluxoCaixa.BuildingBlocks.Api.ApiDefaults).Assembly;
+
+    [Fact]
+    public void BuildingBlocks_NaoConhecemNenhumServico()
+    {
+        foreach (var assembly in new[] { KernelAssembly, BuildingBlocksApplication, BuildingBlocksInfrastructure, BuildingBlocksApi })
+        {
+            var result = Types.InAssembly(assembly).ShouldNot().HaveDependencyOnAny("Lancamentos", "Consolidacao").GetResult();
+            result.IsSuccessful.ShouldBeTrue($"{assembly.GetName().Name}: {Falhas(result)}");
+        }
+    }
+
+    [Fact]
+    public void BuildingBlocks_KernelEApplication_SemDependenciaDeInfraestrutura()
+    {
+        string[] proibidos = ["Dapper", "Npgsql", "RabbitMQ", "Microsoft.AspNetCore", "DbUp"];
+
+        foreach (var assembly in new[] { KernelAssembly, BuildingBlocksApplication })
+        {
+            var result = Types.InAssembly(assembly).ShouldNot().HaveDependencyOnAny(proibidos).GetResult();
+            result.IsSuccessful.ShouldBeTrue($"{assembly.GetName().Name}: {Falhas(result)}");
+        }
+    }
+
+    [Fact]
+    public void BuildingBlocks_Kernel_NaoDependeDeApplicationInfrastructureNemApi()
+    {
+        var result = Types.InAssembly(KernelAssembly)
+            .ShouldNot().HaveDependencyOnAny("FluxoCaixa.BuildingBlocks.Application", "FluxoCaixa.BuildingBlocks.Infrastructure", "FluxoCaixa.BuildingBlocks.Api")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(Falhas(result));
+    }
+
     [Fact]
     public void External_NaoDependeDe_Api()
     {

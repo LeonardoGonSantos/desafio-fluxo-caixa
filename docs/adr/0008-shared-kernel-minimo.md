@@ -1,21 +1,30 @@
-# ADR 0008 — Shared Kernel mínimo e contratos por consumidor
+# ADR 0008 — Shared Kernel mínimo, infraestrutura compartilhada e contratos por consumidor
 
-**Status:** aceito
+**Status:** aceito (revisado após o code review)
 
 ## Decisão
-`FluxoCaixa.BuildingBlocks` contém **apenas primitivas genéricas** de DDD/CQRS: `Entity`, `AggregateRoot`, `ValueObject`,
-`Money`, `Result`/`Error`, interfaces de handler. Segue a ideia de *Shared Kernel* do Evans (cap. 14): pequeno, estável e
-acordado entre os dois lados.
+O que é compartilhado entre os serviços vive em `src/BuildingBlocks`, dividido por **motivo de mudança**:
 
-**Não** compartilhamos o contrato de integração: o `LancamentoRegistradoIntegrationEvent` é declarado pelo publicador
-(Lançamentos, versão no `EventType` = `lancamento.registrado.v1`) e **copiado** pelo consumidor (Consolidação).
+| Projeto | Conteúdo | Pode depender de |
+|---|---|---|
+| `FluxoCaixa.BuildingBlocks` | *Shared Kernel* (Evans, cap. 14): `Entity`, `AggregateRoot`, `ValueObject`, `Money`, `Result`/`Error`, interfaces CQRS. | nada de infraestrutura |
+| `FluxoCaixa.BuildingBlocks.Application` | Decorators (validação, transação, log), `IUnitOfWork`, `AddCqrs(assembly)`. | Kernel, FluentValidation, Scrutor |
+| `FluxoCaixa.BuildingBlocks.Infrastructure` | `DbSession`/`UnitOfWork` (Dapper/Npgsql), `DatabaseMigrator` (DbUp), conexão RabbitMQ. | Application |
+| `FluxoCaixa.BuildingBlocks.Api` | `ProblemDetails`, middleware de correlação, tratamento global de exceções, health checks, `AddApiDefaults`. | Infrastructure, ASP.NET Core |
+
+**Nunca compartilhado:** o contrato de integração. O `LancamentoRegistradoIntegrationEvent` é declarado pelo publicador
+(Lançamentos, versionado em `EventType` = `lancamento.registrado.v1`) e **copiado** pelo consumidor (Consolidação).
 Os serviços só concordam no formato JSON.
 
 ## Por quê
-Um assembly de contratos compartilhado obriga a fazer deploy coordenado de ambos a cada mudança. Com a cópia por consumidor,
-cada lado evolui no seu ritmo (campos adicionais são ignorados) e mudanças incompatíveis exigem um novo `EventType` (v2).
-Testes de arquitetura garantem que um serviço não referencia o outro.
+- Antes do refinamento havia 13 arquivos de infraestrutura duplicados entre os serviços (decorators, sessão de banco,
+  migrator, middlewares). Isso viola DRY e faz correções precisarem ser repetidas em dois lugares.
+- Um assembly de **contratos** compartilhado, por outro lado, obrigaria deploy coordenado a cada mudança; a cópia por
+  consumidor permite evolução independente (campos novos são ignorados; mudança incompatível exige `v2`).
+- A divisão em quatro projetos evita que o domínio herde dependências de infraestrutura: testes de arquitetura garantem
+  que o Kernel e o `BuildingBlocks.Application` não referenciam Dapper, Npgsql, RabbitMQ nem ASP.NET Core, e que nenhum
+  BuildingBlock conhece `Lancamentos` ou `Consolidacao`.
 
 ## Custo assumido
-Pequena duplicação de código de infraestrutura (`DbSession`, migrator, decorators) entre os dois serviços, preferida a um
-projeto "common" que acoplaria os ciclos de vida. Se aparecer um terceiro serviço, extrair um pacote de infraestrutura passa a compensar.
+Uma mudança em um BuildingBlock afeta os dois serviços. É aceitável enquanto estiverem no mesmo repositório e versão;
+se forem separados em repositórios, esses projetos viram pacotes NuGet versionados.
