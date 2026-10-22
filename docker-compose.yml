@@ -81,9 +81,11 @@ services:
       - ./tests/load/k6:/scripts:ro
     environment:
       BASE_URL: http://consolidacao-api:8080
+      LANCAMENTOS_URL: http://lancamentos-api:8080
     command: run /scripts/saldo-diario.js
     depends_on:
       - consolidacao-api
+      - lancamentos-api
 
 volumes:
   pgdata:
