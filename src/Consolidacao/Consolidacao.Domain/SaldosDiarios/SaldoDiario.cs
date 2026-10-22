@@ -31,7 +31,8 @@ public sealed class SaldoDiario : AggregateRoot<DateOnly>
     public static SaldoDiario Abrir(DateOnly data, DateTimeOffset agora) =>
         new(data, Money.Zero, Money.Zero, agora);
 
-    public static SaldoDiario Rehydrate(
+    /// <summary>Reconstrói o agregado a partir do banco, sem revalidar. Visível só para a infraestrutura.</summary>
+    internal static SaldoDiario Rehydrate(
         DateOnly data, decimal totalCreditos, decimal totalDebitos, DateTimeOffset atualizadoEm) =>
         new(data, Money.FromTrusted(totalCreditos), Money.FromTrusted(totalDebitos), atualizadoEm);
 

@@ -170,10 +170,23 @@ public class LancamentoTests
 
         var estorno = original.Estornar("Lançado por engano", _time).Value;
 
-        original.DomainEvents.ShouldBeEmpty();
         var evento = estorno.DomainEvents.ShouldHaveSingleItem().ShouldBeOfType<LancamentoRegistradoDomainEvent>();
         evento.Tipo.ShouldBe(TipoLancamento.Debito);
         evento.LancamentoId.ShouldBe(estorno.Id);
+    }
+
+    [Fact]
+    public void Estornar_LancamentoAtivo_RegistraEventoDeAuditoriaNoOriginal()
+    {
+        var original = NovoCredito();
+        original.ClearDomainEvents();
+
+        var estorno = original.Estornar("  Engano de digitação ", _time).Value;
+
+        var auditoria = original.DomainEvents.ShouldHaveSingleItem().ShouldBeOfType<LancamentoEstornadoDomainEvent>();
+        auditoria.LancamentoOriginalId.ShouldBe(original.Id);
+        auditoria.LancamentoEstornoId.ShouldBe(estorno.Id);
+        auditoria.Motivo.ShouldBe("Engano de digitação");
     }
 
     [Fact]
@@ -211,11 +224,22 @@ public class LancamentoTests
     }
 
     [Fact]
-    public void Estornar_MotivoMuitoLongo_TruncaDescricaoSemFalhar()
+    public void Estornar_MotivoMuitoLongo_RetornaErroENaoAlteraOriginal()
     {
         var original = NovoCredito();
+        original.ClearDomainEvents();
 
-        var result = original.Estornar(new string('x', 500), _time);
+        var result = original.Estornar(new string('x', Lancamento.MotivoEstornoTamanhoMaximo + 1), _time);
+
+        result.Error.ShouldBe(LancamentoErrors.MotivoMuitoLongo);
+        original.Status.ShouldBe(StatusLancamento.Ativo);
+        original.DomainEvents.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Estornar_MotivoNoLimiteExato_Aceita()
+    {
+        var result = NovoCredito().Estornar(new string('x', Lancamento.MotivoEstornoTamanhoMaximo), _time);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Descricao.Valor.Length.ShouldBe(Descricao.TamanhoMaximo);

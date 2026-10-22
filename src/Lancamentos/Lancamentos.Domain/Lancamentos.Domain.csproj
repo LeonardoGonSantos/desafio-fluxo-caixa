@@ -2,4 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../../BuildingBlocks/FluxoCaixa.BuildingBlocks/FluxoCaixa.BuildingBlocks.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Lancamentos.External" />
+  </ItemGroup>
 </Project>

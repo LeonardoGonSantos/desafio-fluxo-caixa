@@ -2,6 +2,7 @@ using Lancamentos.Application.Abstractions;
 using Lancamentos.Application.IntegrationEvents;
 using Lancamentos.Application.Lancamentos.EstornarLancamento;
 using Lancamentos.Domain.Lancamentos;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Shouldly;
@@ -19,7 +20,8 @@ public class EstornarLancamentoCommandHandlerTests
     private readonly EstornarLancamentoCommandHandler _handler;
 
     public EstornarLancamentoCommandHandlerTests() =>
-        _handler = new EstornarLancamentoCommandHandler(_repository, _outbox, _time);
+        _handler = new EstornarLancamentoCommandHandler(
+            _repository, _outbox, _time, NullLogger<EstornarLancamentoCommandHandler>.Instance);
 
     private Lancamento Existente()
     {
@@ -77,5 +79,18 @@ public class EstornarLancamentoCommandHandlerTests
         await _outbox.Received(1).EnqueueAsync(
             Arg.Is<LancamentoRegistradoIntegrationEvent>(e => e.Tipo == "Debito" && e.Valor == 100m),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_Valido_EventoDeAuditoriaNaoViraMensagemDeIntegracao()
+    {
+        var original = Existente();
+
+        await _handler.Handle(new EstornarLancamentoCommand(original.Id, "Engano"), CancellationToken.None);
+
+        // Só o evento do lançamento de estorno é publicado; o de auditoria do original não.
+        await _outbox.Received(1).EnqueueAsync(
+            Arg.Any<LancamentoRegistradoIntegrationEvent>(), Arg.Any<CancellationToken>());
+        original.DomainEvents.ShouldBeEmpty();
     }
 }

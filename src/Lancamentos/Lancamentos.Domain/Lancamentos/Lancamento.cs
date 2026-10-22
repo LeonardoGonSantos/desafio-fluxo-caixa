@@ -31,6 +31,11 @@ public sealed class Lancamento : AggregateRoot<Guid>
         CriadoEm = criadoEm;
     }
 
+    private const string PrefixoEstorno = "Estorno: ";
+
+    /// <summary>Tamanho máximo do motivo: a descrição do estorno é "Estorno: {motivo}" e cabe em <see cref="Descricao.TamanhoMaximo"/>.</summary>
+    public static readonly int MotivoEstornoTamanhoMaximo = Descricao.TamanhoMaximo - PrefixoEstorno.Length;
+
     public TipoLancamento Tipo { get; }
 
     public Money Valor { get; }
@@ -73,24 +78,27 @@ public sealed class Lancamento : AggregateRoot<Guid>
             return LancamentoErrors.MotivoObrigatorio;
         }
 
-        var hoje = DataAtual(timeProvider);
-        var descricaoEstorno = $"Estorno: {motivo.Trim()}";
-        if (descricaoEstorno.Length > Descricao.TamanhoMaximo)
+        var motivoNormalizado = motivo.Trim();
+        if (motivoNormalizado.Length > MotivoEstornoTamanhoMaximo)
         {
-            descricaoEstorno = descricaoEstorno[..Descricao.TamanhoMaximo];
+            return LancamentoErrors.MotivoMuitoLongo;
         }
 
-        var estorno = Criar(Tipo.Inverso(), Valor.Amount, descricaoEstorno, hoje, Id, timeProvider);
+        var estorno = Criar(
+            Tipo.Inverso(), Valor.Amount, PrefixoEstorno + motivoNormalizado, DataAtual(timeProvider), Id, timeProvider);
         if (estorno.IsFailure)
         {
             return estorno;
         }
 
         Status = StatusLancamento.Estornado;
+        Raise(new LancamentoEstornadoDomainEvent(
+            Guid.NewGuid(), timeProvider.GetUtcNow(), Id, estorno.Value.Id, motivoNormalizado));
         return estorno;
     }
 
-    public static Lancamento Rehydrate(
+    /// <summary>Reconstrói o agregado a partir do banco, sem revalidar. Visível só para a infraestrutura.</summary>
+    internal static Lancamento Rehydrate(
         Guid id,
         TipoLancamento tipo,
         decimal valor,

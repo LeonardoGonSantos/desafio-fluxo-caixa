@@ -22,6 +22,9 @@ public static class LancamentoErrors
     public static readonly Error MotivoObrigatorio =
         Error.Validation("lancamento.motivo_obrigatorio", "O motivo do estorno é obrigatório.");
 
+    public static readonly Error MotivoMuitoLongo =
+        Error.Validation("lancamento.motivo_longo", "O motivo do estorno excede o tamanho máximo permitido.");
+
     public static readonly Error NaoEncontrado =
         Error.NotFound("lancamento.nao_encontrado", "Lançamento não encontrado.");
 

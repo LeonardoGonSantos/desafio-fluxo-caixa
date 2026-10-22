@@ -15,15 +15,28 @@ public static class IntegrationEventMapper
         domainEvent.Valor,
         domainEvent.DataCompetencia);
 
-    /// <summary>Converte e enfileira no outbox todos os eventos pendentes do agregado.</summary>
+    /// <summary>
+    /// Enfileira no outbox os eventos de domínio que viram contrato de integração e limpa os pendentes.
+    /// Evento sem decisão explícita lança exceção: ignorar em silêncio faria um evento novo se perder sem ninguém notar.
+    /// </summary>
     public static async Task EnqueueDomainEventsAsync(
         this IOutbox outbox, AggregateRoot<Guid> aggregate, CancellationToken cancellationToken)
     {
         foreach (var domainEvent in aggregate.DomainEvents)
         {
-            if (domainEvent is LancamentoRegistradoDomainEvent registrado)
+            switch (domainEvent)
             {
-                await outbox.EnqueueAsync(Map(registrado), cancellationToken);
+                case LancamentoRegistradoDomainEvent registrado:
+                    await outbox.EnqueueAsync(Map(registrado), cancellationToken);
+                    break;
+
+                case LancamentoEstornadoDomainEvent:
+                    // Somente auditoria: o estorno chega à Consolidação como lançamento inverso.
+                    break;
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Evento de domínio sem mapeamento para integração: {domainEvent.GetType().Name}.");
             }
         }
 
