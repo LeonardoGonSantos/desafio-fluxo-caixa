@@ -1,0 +1,89 @@
+name: fluxo-caixa
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: fluxo
+      POSTGRES_PASSWORD: fluxo
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fluxo -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: fluxo
+      RABBITMQ_DEFAULT_PASS: fluxo
+    ports:
+      - "5672:5672"
+      - "15672:15672" # painel: http://localhost:15672 (fluxo / fluxo)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  lancamentos-api:
+    build:
+      context: .
+      dockerfile: src/Lancamentos/Lancamentos.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Lancamentos: "Host=postgres;Port=5432;Database=lancamentos;Username=fluxo;Password=fluxo"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: fluxo
+      RabbitMq__Password: fluxo
+      Swagger__Enabled: "true"
+    ports:
+      - "5001:8080" # Swagger: http://localhost:5001/swagger
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  consolidacao-api:
+    build:
+      context: .
+      dockerfile: src/Consolidacao/Consolidacao.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Consolidacao: "Host=postgres;Port=5432;Database=consolidacao;Username=fluxo;Password=fluxo"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: fluxo
+      RabbitMq__Password: fluxo
+      Swagger__Enabled: "true"
+    ports:
+      - "5002:8080" # Swagger: http://localhost:5002/swagger
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  k6:
+    image: grafana/k6:latest
+    profiles: ["load"] # docker compose --profile load run --rm k6
+    volumes:
+      - ./tests/load/k6:/scripts:ro
+    environment:
+      BASE_URL: http://consolidacao-api:8080
+    command: run /scripts/saldo-diario.js
+    depends_on:
+      - consolidacao-api
+
+volumes:
+  pgdata:
