@@ -1,9 +1,7 @@
-using Dapper;
 using Lancamentos.External.Messaging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Npgsql;
 
 namespace Lancamentos.External.Outbox;
 
@@ -13,21 +11,12 @@ namespace Lancamentos.External.Outbox;
 /// segue operando normalmente.
 /// </summary>
 public sealed class OutboxProcessor(
-    NpgsqlDataSource dataSource,
+    IOutboxStore store,
     IMessagePublisher publisher,
     IOptions<OutboxOptions> options,
     TimeProvider timeProvider,
     ILogger<OutboxProcessor> logger) : BackgroundService
 {
-    private const string SelectPendingSql = """
-        SELECT id, type, routing_key, payload::text AS payload
-        FROM outbox_messages
-        WHERE processed_at IS NULL
-        ORDER BY occurred_at
-        LIMIT @batchSize
-        FOR UPDATE SKIP LOCKED
-        """;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -67,44 +56,38 @@ public sealed class OutboxProcessor(
     }
 
     /// <summary>Processa um lote. Retorna quantas mensagens foram publicadas.</summary>
-    /// <exception cref="Exception">Relança a falha de publicação após registrar a tentativa no banco.</exception>
+    /// <exception cref="Exception">Relança a falha de publicação depois de registrá-la e liberar o restante do lote.</exception>
     public async Task<int> ProcessBatchAsync(CancellationToken cancellationToken)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-        var pending = (await connection.QueryAsync<PendingRow>(new CommandDefinition(
-            SelectPendingSql, new { batchSize = options.Value.BatchSize }, transaction,
-            cancellationToken: cancellationToken))).ToList();
+        var settings = options.Value;
+        var batch = await store.ClaimBatchAsync(settings.BatchSize, settings.LeaseDuration, cancellationToken);
 
         var published = 0;
         Exception? failure = null;
 
-        foreach (var row in pending)
+        for (var i = 0; i < batch.Count && failure is null; i++)
         {
+            var message = batch[i];
             try
             {
-                await publisher.PublishAsync(
-                    new OutboxMessage(row.Id, row.Type, row.RoutingKey, row.Payload), cancellationToken);
+                await publisher.PublishAsync(message, cancellationToken);
 
-                await connection.ExecuteAsync(new CommandDefinition(
-                    "UPDATE outbox_messages SET processed_at = @now, attempts = attempts + 1, last_error = NULL WHERE id = @id",
-                    new { id = row.Id, now = timeProvider.GetUtcNow() }, transaction,
-                    cancellationToken: cancellationToken));
+                // Já foi publicada: marca mesmo durante o shutdown, para não republicar sem necessidade.
+                await store.MarkProcessedAsync(message.Id, CancellationToken.None);
                 published++;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException)
             {
-                await connection.ExecuteAsync(new CommandDefinition(
-                    "UPDATE outbox_messages SET attempts = attempts + 1, last_error = @error WHERE id = @id",
-                    new { id = row.Id, error = Truncate(ex.Message) }, transaction,
-                    cancellationToken: cancellationToken));
+                await ReleaseRemainingAsync(batch, i);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await store.MarkFailedAsync(message.Id, Truncate(ex.Message), CancellationToken.None);
+                await ReleaseRemainingAsync(batch, i + 1); // preserva a ordem: não segue enquanto esta falhar
                 failure = ex;
-                break; // preserva a ordem: não publica as seguintes se esta falhou
             }
         }
-
-        await transaction.CommitAsync(cancellationToken);
 
         if (failure is not null)
         {
@@ -119,7 +102,8 @@ public sealed class OutboxProcessor(
         return published;
     }
 
-    private static string Truncate(string value) => value.Length <= 1000 ? value : value[..1000];
+    private Task ReleaseRemainingAsync(IReadOnlyList<OutboxMessage> batch, int fromIndex) =>
+        store.ReleaseAsync(batch.Skip(fromIndex).Select(m => m.Id).ToList(), CancellationToken.None);
 
-    private sealed record PendingRow(Guid Id, string Type, string RoutingKey, string Payload);
+    private static string Truncate(string value) => value.Length <= 1000 ? value : value[..1000];
 }

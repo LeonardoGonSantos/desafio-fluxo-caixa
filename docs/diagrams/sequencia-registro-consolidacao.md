@@ -18,10 +18,10 @@ sequenceDiagram
     API-->>C: 201 Created (+ Location)
 
     loop a cada 1 s (ou imediatamente se houver lote cheio)
-        OP->>DB: SELECT pendentes … FOR UPDATE SKIP LOCKED
-        OP->>MQ: publish (mandatory + publisher confirm)
+        OP->>DB: claim: UPDATE locked_until=now()+lease … SKIP LOCKED (commit imediato)
+        OP->>MQ: publish (mandatory + publisher confirm) — fora de transação
         alt broker fora do ar OU sem fila vinculada
-            OP->>DB: attempts++ (mensagem continua pendente) e backoff
+            OP->>DB: attempts++, libera a mensagem e o resto do lote; backoff
         else confirmado
             OP->>DB: processed_at = now()
         end

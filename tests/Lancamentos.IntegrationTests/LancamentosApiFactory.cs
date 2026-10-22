@@ -10,22 +10,24 @@ namespace Lancamentos.IntegrationTests;
 
 /// <summary>
 /// API de Lançamentos em memória apontando para containers reais.
-/// Cada instância usa um banco novo; o loop em background do outbox é praticamente desligado
-/// (intervalo de 1h) para que os testes dirijam o processamento de forma determinística.
+/// Cada instância usa um banco novo; o loop em background do outbox fica desligado
+/// (Outbox:Enabled=false) para que os testes dirijam o processamento de forma determinística.
 /// </summary>
 public sealed class LancamentosApiFactory : WebApplicationFactory<Program>
 {
     private readonly InfraFixture _infra;
     private readonly bool _rabbitAvailable;
+    private readonly bool _backgroundOutbox;
     private readonly string _database = $"lancamentos_{Guid.NewGuid():N}";
 
     /// <summary>Exchange exclusivo por instância: isola filas/bindings entre testes.</summary>
     public string Exchange { get; } = $"fluxo.test.{Guid.NewGuid():N}";
 
-    public LancamentosApiFactory(InfraFixture infra, bool rabbitAvailable = true)
+    public LancamentosApiFactory(InfraFixture infra, bool rabbitAvailable = true, bool backgroundOutbox = false)
     {
         _infra = infra;
         _rabbitAvailable = rabbitAvailable;
+        _backgroundOutbox = backgroundOutbox;
     }
 
     public string ConnectionString => new NpgsqlConnectionStringBuilder(_infra.Postgres.GetConnectionString())
@@ -37,7 +39,8 @@ public sealed class LancamentosApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Lancamentos", ConnectionString);
-        builder.UseSetting("Outbox:PollingInterval", "01:00:00");
+        builder.UseSetting("Outbox:Enabled", _backgroundOutbox ? "true" : "false");
+        builder.UseSetting("Outbox:PollingInterval", "00:00:00.200");
         builder.UseSetting("Swagger:Enabled", "true");
 
         // Broker "fora do ar": porta onde ninguém escuta.

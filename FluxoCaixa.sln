@@ -55,6 +55,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxoCaixa.BuildingBlocks.A
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxoCaixa.BuildingBlocks.Application.Tests", "tests\FluxoCaixa.BuildingBlocks.Application.Tests\FluxoCaixa.BuildingBlocks.Application.Tests.csproj", "{90AC7D64-41DD-4A81-A666-4358246A1D16}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lancamentos.External.Tests", "tests\Lancamentos.External.Tests\Lancamentos.External.Tests.csproj", "{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -317,6 +319,18 @@ Global
 		{90AC7D64-41DD-4A81-A666-4358246A1D16}.Release|x64.Build.0 = Release|Any CPU
 		{90AC7D64-41DD-4A81-A666-4358246A1D16}.Release|x86.ActiveCfg = Release|Any CPU
 		{90AC7D64-41DD-4A81-A666-4358246A1D16}.Release|x86.Build.0 = Release|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Debug|x64.Build.0 = Debug|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Debug|x86.Build.0 = Debug|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Release|x64.ActiveCfg = Release|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Release|x64.Build.0 = Release|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Release|x86.ActiveCfg = Release|Any CPU
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -346,5 +360,6 @@ Global
 		{94AE4D61-9BC1-4C8F-BAD4-E326DEE4F84D} = {90298CBA-BD6F-3A0A-69D5-97CAD7B05E7E}
 		{CC121B1D-55D2-4B41-BC4F-25DA66579266} = {90298CBA-BD6F-3A0A-69D5-97CAD7B05E7E}
 		{90AC7D64-41DD-4A81-A666-4358246A1D16} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{E7095B94-B128-4DAE-8A4B-E9D4C92B0C02} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

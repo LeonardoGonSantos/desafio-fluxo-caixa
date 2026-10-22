@@ -110,6 +110,31 @@ public sealed class OutboxResilienceTests
         (await channel.BasicGetAsync("q.tardia", autoAck: true)).ShouldNotBeNull();
     }
 
+    [Fact]
+    public async Task OutboxProcessor_ComLoopEmSegundoPlanoLigado_PublicaSemIntervencao()
+    {
+        await using var factory = new LancamentosApiFactory(_infra, backgroundOutbox: true);
+        using var client = factory.CreateClient();
+        await using var channel = await factory.CreateRabbitChannelAsync();
+        await BindQueueAsync(channel, factory.Exchange, "q.background");
+
+        var id = await PostLancamentoAsync(client);
+
+        BasicGetResult? message = null;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (message is null && DateTime.UtcNow < deadline)
+        {
+            message = await channel.BasicGetAsync("q.background", autoAck: true);
+            await Task.Delay(100);
+        }
+
+        message.ShouldNotBeNull();
+        JsonDocument.Parse(message.Body.ToArray()).RootElement.GetProperty("lancamentoId").GetGuid().ShouldBe(id);
+        (await factory.QueryScalarAsync<long>(
+            "SELECT count(*) FROM outbox_messages WHERE processed_at IS NOT NULL AND payload->>'lancamentoId' = @id",
+            new { id = id.ToString() })).ShouldBe(1);
+    }
+
     private static async Task BindQueueAsync(IChannel channel, string exchange, string queue)
     {
         await channel.ExchangeDeclareAsync(exchange, ExchangeType.Topic, durable: true);

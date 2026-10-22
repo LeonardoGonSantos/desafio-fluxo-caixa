@@ -2,6 +2,7 @@ using System.Text;
 using Lancamentos.External.Resilience;
 using Microsoft.Extensions.Options;
 using Polly;
+using Polly.Registry;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
 
@@ -9,13 +10,23 @@ using FluxoCaixa.BuildingBlocks.Infrastructure.Messaging;
 
 namespace Lancamentos.External.Messaging;
 
-public sealed class RabbitMqPublisher(
-    RabbitMqConnectionProvider connectionProvider,
-    IOptions<RabbitMqOptions> options) : IMessagePublisher, IAsyncDisposable
+public sealed class RabbitMqPublisher : IMessagePublisher, IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly ResiliencePipeline _pipeline = ResiliencePipelines.CreatePublishPipeline();
+    private readonly RabbitMqConnectionProvider _connectionProvider;
+    private readonly IOptions<RabbitMqOptions> _options;
+    private readonly ResiliencePipeline _pipeline;
     private IChannel? _channel;
+
+    public RabbitMqPublisher(
+        RabbitMqConnectionProvider connectionProvider,
+        IOptions<RabbitMqOptions> options,
+        ResiliencePipelineProvider<string> pipelines)
+    {
+        _connectionProvider = connectionProvider;
+        _options = options;
+        _pipeline = pipelines.GetPipeline(PublishResilience.PipelineName);
+    }
 
     public async Task PublishAsync(OutboxMessage message, CancellationToken cancellationToken) =>
         await _pipeline.ExecuteAsync(
@@ -43,7 +54,7 @@ public sealed class RabbitMqPublisher(
                 // mandatory + confirm tracking: se nenhuma fila estiver vinculada, o broker devolve a
                 // mensagem e o client lança PublishReturnException — ela fica no outbox, não é perdida.
                 await channel.BasicPublishAsync(
-                    options.Value.Exchange,
+                    _options.Value.Exchange,
                     message.RoutingKey,
                     mandatory: true,
                     basicProperties: properties,
@@ -75,7 +86,7 @@ public sealed class RabbitMqPublisher(
         }
 
         await DiscardChannelAsync();
-        var connection = await connectionProvider.GetConnectionAsync(cancellationToken);
+        var connection = await _connectionProvider.GetConnectionAsync(cancellationToken);
         var channel = await connection.CreateChannelAsync(
             new CreateChannelOptions(
                 publisherConfirmationsEnabled: true,
@@ -83,7 +94,7 @@ public sealed class RabbitMqPublisher(
             cancellationToken);
 
         await channel.ExchangeDeclareAsync(
-            options.Value.Exchange, ExchangeType.Topic, durable: true, autoDelete: false,
+            _options.Value.Exchange, ExchangeType.Topic, durable: true, autoDelete: false,
             cancellationToken: cancellationToken);
 
         _channel = channel;

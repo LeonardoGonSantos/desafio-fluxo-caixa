@@ -2,6 +2,7 @@ using Lancamentos.Application.Abstractions;
 using Lancamentos.External.Idempotency;
 using Lancamentos.External.Messaging;
 using Lancamentos.External.Outbox;
+using Lancamentos.External.Resilience;
 using Lancamentos.External.Persistence.Queries;
 using Lancamentos.External.Persistence.Repositories;
 using Lancamentos.Domain.Lancamentos;
@@ -51,6 +52,7 @@ public static class DependencyInjection
 
         services.AddSingleton(sp => new RabbitMqConnectionProvider(
             sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value, "lancamentos-api"));
+        services.AddPublishResilience(configuration);
         services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
 
         services.AddSingleton(sp => new DatabaseMigrator(
@@ -58,8 +60,14 @@ public static class DependencyInjection
 
         // A ordem importa: as migrations rodam antes do processador de outbox.
         services.AddHostedService<MigrationHostedService>();
+        services.AddSingleton<IOutboxStore, PostgresOutboxStore>();
         services.AddSingleton<OutboxProcessor>();
-        services.AddHostedService(sp => sp.GetRequiredService<OutboxProcessor>());
+
+        // Permite desligar o loop em segundo plano (ex.: réplicas só de API, ou testes que conduzem o processamento).
+        if (configuration.GetValue("Outbox:Enabled", true))
+        {
+            services.AddHostedService(sp => sp.GetRequiredService<OutboxProcessor>());
+        }
 
         return services;
     }
