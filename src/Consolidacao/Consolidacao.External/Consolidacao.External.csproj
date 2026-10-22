@@ -13,4 +13,7 @@
     <PackageReference Include="Npgsql" />
     <PackageReference Include="RabbitMQ.Client" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Database\Scripts\*.sql" />
+  </ItemGroup>
 </Project>

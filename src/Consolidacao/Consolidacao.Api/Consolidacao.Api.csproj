@@ -8,4 +8,7 @@
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Consolidacao.IntegrationTests" />
+  </ItemGroup>
 </Project>
